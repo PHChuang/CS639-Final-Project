@@ -9,31 +9,32 @@ class DecompositionLoss(nn.Module):
         R: reflectance
         I: illumination
     """
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
+        self.device = device
 
     def reflectance_similarity(self, R_low, R_high):
         return torch.mean(torch.abs(R_low - R_high))
 
     def illumination_smoothness(self, I, Im):
         Im_gray = rgb_to_grayscale(Im)
-        Im_gradient_x = gradient(Im_gray, "x")
-        I_gradient_x = gradient(I, "x")
+        Im_gradient_x = gradient(Im_gray, "x", self.device)
+        I_gradient_x = gradient(I, "x", self.device)
         epsilon = 0.01 * torch.ones_like(Im_gradient_x)
         x_loss = torch.abs(torch.div(I_gradient_x, torch.max(Im_gradient_x, epsilon)))
-        Im_gradient_y = gradient(Im_gray, "y")
-        I_gradient_y = gradient(I, "y")
+        Im_gradient_y = gradient(Im_gray, "y", self.device)
+        I_gradient_y = gradient(I, "y", self.device)
         y_loss = torch.abs(torch.div(I_gradient_y, torch.max(Im_gradient_y, epsilon)))
         mut_loss = torch.mean(x_loss + y_loss)
         return mut_loss
 
     def mutual_consistency(self, I_low, I_high):
-        low_gradient_x = gradient(I_low, "x")
-        high_gradient_x = gradient(I_high, "x")
+        low_gradient_x = gradient(I_low, "x", self.device)
+        high_gradient_x = gradient(I_high, "x", self.device)
         m_gradient_x = low_gradient_x + high_gradient_x
         x_loss = m_gradient_x * torch.exp(-10 * m_gradient_x)
-        low_gradient_y = gradient(I_low, "y")
-        high_gradient_y = gradient(I_high, "y")
+        low_gradient_y = gradient(I_low, "y", self.device)
+        high_gradient_y = gradient(I_high, "y", self.device)
         m_gradient_y = low_gradient_y + high_gradient_y
         y_loss = m_gradient_y * torch.exp(-10 * m_gradient_y)
         mutual_loss = torch.mean(x_loss + y_loss)

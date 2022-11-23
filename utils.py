@@ -41,7 +41,7 @@ def randomFlipRotation(image, mode):
         return np.flipud(image)
 
 
-def gradient(input_tensor, direction):
+def gradient(input_tensor, direction, device):
     channel_num = input_tensor.shape[1]
     smooth_kernel_x = torch.Tensor(np.array([[0, 0], [-1, 1]]))
     smooth_kernel_x = smooth_kernel_x.expand(channel_num, channel_num, 2, 2)
@@ -49,6 +49,7 @@ def gradient(input_tensor, direction):
     kernel = smooth_kernel_x
     if direction == "y":
         kernel = smooth_kernel_y
+    kernel = kernel.to(device)
     input_tensor = F.pad(input_tensor, (0, 1, 0, 1))
     gradient_orig = torch.abs(F.conv2d(input_tensor, kernel))
     grad_min = torch.min(gradient_orig)
@@ -59,6 +60,40 @@ def gradient(input_tensor, direction):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def pad_to(x, stride):
+    """https://stackoverflow.com/questions/66028743/how-to-handle-odd-resolutions-in-unet-architecture-pytorch
+    """
+    h, w = x.shape[-2:]
+
+    if h % stride > 0:
+        new_h = h + stride - h % stride
+    else:
+        new_h = h
+    if w % stride > 0:
+        new_w = w + stride - w % stride
+    else:
+        new_w = w
+    lh, uh = int((new_h-h) / 2), int(new_h-h) - int((new_h-h) / 2)
+    lw, uw = int((new_w-w) / 2), int(new_w-w) - int((new_w-w) / 2)
+    pads = (lw, uw, lh, uh)
+
+    # zero-padding by default.
+    # See others at https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.pad
+    out = F.pad(x, pads, "constant", 0)
+
+    return out, pads
+
+
+def unpad(x, pad):
+    """https://stackoverflow.com/questions/66028743/how-to-handle-odd-resolutions-in-unet-architecture-pytorch
+    """
+    if pad[2]+pad[3] > 0:
+        x = x[:,:,pad[2]:-pad[3],:]
+    if pad[0]+pad[1] > 0:
+        x = x[:,:,:,pad[0]:-pad[1]]
+    return x
 
 
 def load_image(path):

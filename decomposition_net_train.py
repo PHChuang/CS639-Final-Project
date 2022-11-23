@@ -1,7 +1,6 @@
 # python imports
 import os
 import argparse
-from tqdm import tqdm
 import time
 import sys
 
@@ -13,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from custom_dataloader import LOLLoader
-from utils import AverageMeter, save_image, count_parameters, save_tensor_to_image
+from utils import AverageMeter, count_parameters, save_tensor_to_image
 
 # from model import DecompositionNet
 from decomposition_model import DecompositionNet
@@ -22,10 +21,7 @@ from torch.optim import lr_scheduler
 
 import custom_transforms as transforms
 
-import cv2
-import numpy as np
 
-# TODO: arg parser
 parser = argparse.ArgumentParser(description="Low-light Image Enhancement")
 parser.add_argument("data_folder", metavar="DIR", help="path to dataset")
 parser.add_argument(
@@ -77,7 +73,6 @@ parser.add_argument(
     action="store_true",
     help="evaluate model on validation set",
 )
-parser.add_argument("--gpu", default=0, type=int, help="GPU ID to use.")
 parser.add_argument(
     "-b", "--batch-size", default=10, type=int, help="batch size (default: 10)"
 )
@@ -89,17 +84,14 @@ def main(args):
     # using mps or gpu or cpu
     device = "mps" if getattr(torch,'has_mps',False) \
             else "gpu" if torch.cuda.is_available() else "cpu"
-    device = "cpu"
     device = torch.device(device)
 
-    # TODO: fix the random seeds
-
     # set up model and loss
-    model = DecompositionNet()
     model_arch = "DecompositionNet"
-    model.to(device)
-    criterion = DecompositionLoss()
-    criterion.to(device)
+    model = DecompositionNet()
+    model = model.to(device)
+    criterion = DecompositionLoss(device)
+    criterion = criterion.to(device)
 
     # setup optimizer and scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0004)
@@ -112,10 +104,6 @@ def main(args):
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint["epoch"]
             model.load_state_dict(checkpoint["state_dict"])
-            if args.gpu < 0:
-                model = model.cpu()
-            else:
-                model = model.cuda(args.gpu)
             # only load the optimizer if necessary
             if not args.evaluate:
                 optimizer.load_state_dict(checkpoint["optimizer"])
@@ -139,13 +127,13 @@ def main(args):
     test_dataset = LOLLoader(args.data_folder, split="test", is_train=False, transforms=test_transforms, patch_size=args.patch_size)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=15, shuffle=False)
 
     # evaluation
     if args.resume and args.evaluate:
         print("Testing the model ...")
         # cudnn.deterministic = True
-        validate(test_loader, model, -1, args)
+        validate(test_loader, model, -1, args, device, path="decomposition_testing_image")
         return
 
     # start training
@@ -161,29 +149,30 @@ def main(args):
                 "model_arch": model_arch,
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
-            }
+            },
+            file_folder="./models_decomp/",
         )
 
         # validation during training
         if epoch % args.print_freq == 0:
-            validate(test_loader, model, epoch, args, "./intermediate_testing_image")
+            validate(test_loader, model, epoch, args, device, "./decomposition_intermediate_testing_image")
 
 def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, device):
     losses = AverageMeter()
     batch_time = AverageMeter()
 
     model.train()
-    end = time.time()
     for i, (img_high, img_low) in enumerate(train_loader):
+        end = time.time()
         if i == 0:
-            print(f"[DEBUG] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
+            print(f"[Training] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
 
         # zero gradient
         optimizer.zero_grad()
 
         # put data to device
-        img_high.to(device)
-        img_low.to(device)
+        img_high = img_high.to(device)
+        img_low = img_low.to(device)
 
         # compute output
         reflect_high, illu_high = model(img_high)
@@ -199,7 +188,6 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, dev
 
         # measure elapsed time
         batch_time.update(time.time() - end)
-        end = time.time()
 
         if i % args.print_freq == 0:
             print(
@@ -223,7 +211,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, dev
         )
     )
 
-def validate(test_loader, model, epoch, args, path="./testing_image"):
+def validate(test_loader, model, epoch, args, device, path="./testing_image"):
     """Test the model on the validation set"""
 
     epoch_info = ""
@@ -232,24 +220,21 @@ def validate(test_loader, model, epoch, args, path="./testing_image"):
     if not os.path.exists(path):
         os.mkdir(path)
 
-    # switch to evaluate mode (autograd will still track the graph!)
     model.eval()
     with torch.no_grad():
-
         # loop over validation set
         for i, (img_high, img_low) in enumerate(test_loader):
             if i == 0:
-                print(f"[DEBUG] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
+                print(f"[Testing] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
 
-            if args.gpu >= 0:
-                img_high = img_high.cuda(args.gpu, non_blocking=False)
-                img_low = img_low.cuda(args.gpu, non_blocking=False)
+            img_high = img_high.to(device)
+            img_low = img_low.to(device)
 
             # compute output
             reflect_high, illu_high = model(img_high)
             reflect_low, illu_low = model(img_low)
             if i == 0:
-                print(f"[DEBUG] reflect_low.shape: {reflect_low.shape}, illu_low.shape: {illu_low.shape}")
+                print(f"[Testing] reflect_low.shape: {reflect_low.shape}, illu_low.shape: {illu_low.shape}")
 
             # store output
             for j in range(reflect_low.shape[0]):
