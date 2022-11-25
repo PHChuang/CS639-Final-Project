@@ -187,7 +187,7 @@ def train(train_loader, model_decomposition, model_resotration, criterion, optim
     for i, (img_high, img_low) in enumerate(train_loader):
         end = time.time()
         if i == 0:
-            print(f"[DEBUG] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
+            print(f"[Train] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
 
         # zero gradient
         optimizer.zero_grad()
@@ -254,7 +254,7 @@ def validate(test_loader, model_decomposition, model_restoration, epoch, args, d
             img_low, pads = pad_to(img_low, 16)
 
             if i == 0:
-                print(f"[DEBUG] img_low.shape: {img_low.shape}")
+                print(f"[Testing] img_low.shape: {img_low.shape}")
 
             img_low = img_low.to(device)
 
@@ -263,10 +263,12 @@ def validate(test_loader, model_decomposition, model_restoration, epoch, args, d
             restoration_output = model_restoration(reflect_low, illu_low)
             restoration_output = unpad(restoration_output, pads)
             if i == 0:
-                print(f"[DEBUG] restoration_output.shape: {restoration_output.shape}")
+                print(f"[Testing] restoration_output.shape: {restoration_output.shape}")
 
             # store output
             for j in range(restoration_output.shape[0]):
+                if epoch == -1:
+                    save_tensor_to_image(f"{path}/input_{j}{epoch_info}.jpg", img_low[j])
                 save_tensor_to_image(f"{path}/restoration_{j}{epoch_info}.jpg", restoration_output[j])
 
 
