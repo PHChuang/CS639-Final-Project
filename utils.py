@@ -43,13 +43,12 @@ def randomFlipRotation(image, mode):
 
 def gradient(input_tensor, direction, device):
     channel_num = input_tensor.shape[1]
-    smooth_kernel_x = torch.Tensor(np.array([[0, 0], [-1, 1]]))
-    smooth_kernel_x = smooth_kernel_x.expand(channel_num, channel_num, 2, 2)
-    smooth_kernel_y = smooth_kernel_x.permute(0, 1, 3, 2)
-    kernel = smooth_kernel_x
-    if direction == "y":
-        kernel = smooth_kernel_y
+    if direction == "x":
+        kernel = torch.Tensor(np.array([[0, 0], [-1, 1]])).expand(channel_num, channel_num, 2, 2)
+    elif direction == "y":
+        kernel = torch.Tensor(np.array([[0, -1], [0, 1]])).expand(channel_num, channel_num, 2, 2)
     kernel = kernel.to(device)
+
     input_tensor = F.pad(input_tensor, (0, 1, 0, 1))
     gradient_orig = torch.abs(F.conv2d(input_tensor, kernel))
     grad_min = torch.min(gradient_orig)

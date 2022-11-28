@@ -19,8 +19,8 @@ class DecompositionNet(nn.Module):
 
         # illumination map path
         self.conv7 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
-        # self.conv8 = nn.Conv2d(64, 1, kernel_size=1, stride=1, padding=0) # author's implementation use 1x1 kernel to replace 3x3 kernel
-        self.conv8 = nn.Conv2d(64, 1, kernel_size=3, stride=1, padding=1) # try original 3x3 kernel
+        self.conv8 = nn.Conv2d(64, 1, kernel_size=1, stride=1, padding=0) # author's implementation use 1x1 kernel to replace 3x3 kernel
+        # self.conv8 = nn.Conv2d(64, 1, kernel_size=3, stride=1, padding=1) # try original 3x3 kernel
 
         self.lrelu = nn.LeakyReLU(0.2)
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)

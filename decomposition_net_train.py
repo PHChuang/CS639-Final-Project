@@ -40,7 +40,7 @@ parser.add_argument(
 parser.add_argument(
     "--lr",
     "--learning-rate",
-    default=0.1,
+    default=0.0004,
     type=float,
     metavar="LR",
     help="initial learning rate",
@@ -79,12 +79,21 @@ parser.add_argument(
 parser.add_argument(
     "--patch-size", default=128, type=int, help="patch size (default: 128)"
 )
+parser.add_argument(
+    "--test-gradient",
+    dest="test_gradient",
+    action="store_true",
+    help="test gradient operator",
+)
+
 
 def main(args):
     # using mps or gpu or cpu
     device = "mps" if getattr(torch,'has_mps',False) \
             else "gpu" if torch.cuda.is_available() else "cpu"
+    device = "cpu" # 48 x 48 patch runs faster on cpu
     device = torch.device(device)
+    print(f"=> device: {device}")
 
     # set up model and loss
     model_arch = "DecompositionNet"
@@ -94,7 +103,7 @@ def main(args):
     criterion = criterion.to(device)
 
     # setup optimizer and scheduler
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0004)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.997)
 
     # resume from a checkpoint
@@ -126,8 +135,14 @@ def main(args):
     train_dataset = LOLLoader(args.data_folder, split="train", is_train=True, transforms=train_transforms, patch_size=args.patch_size)
     test_dataset = LOLLoader(args.data_folder, split="test", is_train=False, transforms=test_transforms, patch_size=args.patch_size)
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=15, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, pin_memory=True, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=15, pin_memory=True, shuffle=False)
+
+    # test gradient
+    if args.test_gradient:
+        print("Testing gradient ...")
+        test_gradient(test_loader, device)
+        return
 
     # evaluation
     if args.resume and args.evaluate:
@@ -244,6 +259,39 @@ def validate(test_loader, model, epoch, args, device, path="./testing_image"):
                 save_tensor_to_image(f"{path}/img_high_{j}{epoch_info}.jpg", img_high[j])
                 save_tensor_to_image(f"{path}/reflect_high_{j}{epoch_info}.jpg", reflect_high[j])
                 save_tensor_to_image(f"{path}/illu_high_{j}{epoch_info}.jpg", illu_high[j])
+
+
+def test_gradient(test_loader, device, path="./test_gradient"):
+    from torchvision.transforms.functional import rgb_to_grayscale
+    from utils import gradient
+
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+    for i, (img_high, img_low) in enumerate(test_loader):
+        if i == 0:
+            print(f"[Testing] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
+
+        img_high = img_high.to(device)
+        img_low = img_low.to(device)
+
+        img_high_gray = rgb_to_grayscale(img_high)
+        img_high_gradient_x = gradient(img_high_gray, "x", device)
+        img_high_gradient_y = gradient(img_high_gray, "y", device)
+
+        img_low_gray = rgb_to_grayscale(img_low)
+        img_low_gradient_x = gradient(img_low_gray, "x", device)
+        img_low_gradient_y = gradient(img_low_gray, "y", device)
+
+        print(f"[Testing] img_low_gradient_x.shape: {img_low_gradient_x.shape}, img_low_gradient_y.shape: {img_low_gradient_y.shape}")
+
+        for j in range(img_high_gray.shape[0]):
+            save_tensor_to_image(f"{path}/img_low_gray_{j}.jpg", img_low_gray[j])
+            save_tensor_to_image(f"{path}/img_low_gradient_x_{j}.jpg", img_low_gradient_x[j])
+            save_tensor_to_image(f"{path}/img_low_gradient_y_{j}.jpg", img_low_gradient_y[j])
+            save_tensor_to_image(f"{path}/img_high_gray_{j}.jpg", img_high_gray[j])
+            save_tensor_to_image(f"{path}/img_high_gradient_x_{j}.jpg", img_high_gradient_x[j])
+            save_tensor_to_image(f"{path}/img_high_gradient_y_{j}.jpg", img_high_gradient_y[j])
 
 
 def save_checkpoint(
