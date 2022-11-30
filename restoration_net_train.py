@@ -24,6 +24,7 @@ import custom_transforms as transforms
 import cv2
 import numpy as np
 
+from datetime import datetime
 
 parser = argparse.ArgumentParser(description="Low-light Image Enhancement")
 parser.add_argument("data_folder", metavar="DIR", help="path to dataset")
@@ -107,7 +108,7 @@ def main(args):
     criterion = criterion.to(device)
 
     # setup optimizer and scheduler
-    optimizer = torch.optim.Adam(model_restoration.parameters(), lr=0.0004)
+    optimizer = torch.optim.Adam(model_restoration.parameters(), lr=args.lr)
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.997)
 
     # load decomposition net parameters
@@ -147,8 +148,8 @@ def main(args):
     train_dataset = LOLLoader(args.data_folder, split="train", is_train=True, transforms=train_transforms, patch_size=args.patch_size)
     test_dataset = LOLLoader(args.data_folder, split="test", is_train=False, transforms=test_transforms, patch_size=args.patch_size)
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=15, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, pin_memory=True, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=15, pin_memory=True, shuffle=False)
 
     # evaluation
     if args.resume and args.evaluate:
@@ -184,10 +185,11 @@ def train(train_loader, model_decomposition, model_resotration, criterion, optim
 
     model_decomposition.eval()
     model_resotration.train()
+    print(f"[Training] current time: {datetime.now()}")
     for i, (img_high, img_low) in enumerate(train_loader):
         end = time.time()
         if i == 0:
-            print(f"[Train] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
+            print(f"[Training] img_high.shape: {img_high.shape}, img_low.shape: {img_low.shape}")
 
         # zero gradient
         optimizer.zero_grad()
