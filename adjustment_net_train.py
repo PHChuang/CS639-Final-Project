@@ -107,7 +107,7 @@ def main(args):
     criterion = criterion.to(device)
 
     # setup optimizer and scheduler
-    optimizer = torch.optim.Adam(model_adjustment.parameters(), lr=0.0004)
+    optimizer = torch.optim.Adam(model_adjustment.parameters(), lr=0.0001)
     scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.997)
 
     # load decomposition net parameters
@@ -191,15 +191,22 @@ def train(train_loader, model_decomposition, model_adjustment, criterion, optimi
         optimizer.zero_grad()
 
         # put data to device
-        img_high = img_high.to(device)
         img_low = img_low.to(device)
+        img_high = img_high.to(device)
 
         # compute output
+        illu_low, illu_high = img_low, img_high
         with torch.no_grad():
-            reflect_high, _ = model_decomposition(img_high)
+            reflect_high, illu_high = model_decomposition(img_high)
             reflect_low, illu_low = model_decomposition(img_low)
-        adjustment_output = model_adjustment(reflect_low, illu_low)
-        loss = criterion(adjustment_output, reflect_high)
+            bright_low = torch.mean(illu_low)
+            bright_high = torch.mean(illu_high)
+            ratio_high_to_low = torch.div(bright_low, bright_high)
+            ratio_low_to_high = torch.div(bright_high, bright_low)
+        
+        adjustment_output_low_to_high = model_adjustment(illu_low, ratio_low_to_high)
+        adjustment_output_high_to_low = model_adjustment(illu_high, ratio_high_to_low)
+        loss = criterion(adjustment_output_low_to_high, illu_high) + criterion(adjustment_output_high_to_low, illu_low)
 
         # record loss
         losses.update(loss.item(), img_low.shape[0])
@@ -247,19 +254,24 @@ def validate(test_loader, model_decomposition, model_adjustment, epoch, args, de
     model_adjustment.eval()
     with torch.no_grad():
         # loop over validation set
-        for i, (_, img_low) in enumerate(test_loader):
-            # padding for input to avoid odd resolution issue
-            img_low, pads = pad_to(img_low, 16)
-
+        for i, (img_high, img_low) in enumerate(test_loader):
             if i == 0:
                 print(f"[Testing] img_low.shape: {img_low.shape}")
 
             img_low = img_low.to(device)
+            img_high = img_high.to(device)
 
             # compute output
             reflect_low, illu_low = model_decomposition(img_low)
-            adjustment_output = model_adjustment(reflect_low, illu_low)
-            adjustment_output = unpad(adjustment_output, pads)
+            reflect_high, illu_high = model_decomposition(img_high)
+            bright_low = torch.mean(illu_low)
+            bright_high = torch.mean(illu_high)
+            ratio_high_to_low = torch.div(bright_low, bright_high)
+            ratio_low_to_high = torch.div(bright_high, bright_low)
+            
+            adjustment_output_low_to_high = model_adjustment(illu_low, ratio_low_to_high)
+            adjustment_output_high_to_low = model_adjustment(illu_high, ratio_high_to_low)
+            adjustment_output = torch.cat([illu_low, illu_high, adjustment_output_high_to_low, adjustment_output_low_to_high], dim=1)
             if i == 0:
                 print(f"[Testing] adjustment_output.shape: {adjustment_output.shape}")
 
