@@ -221,8 +221,8 @@ def train(train_loader, model_decomposition, model_adjustment, criterion, optimi
         if i % args.print_freq == 0:
             print(
                 "Epoch: [{0}][{1}/{2}]\t"
-                "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
-                "Loss {loss.val:.2f} ({loss.avg:.2f})".format(
+                "Time {batch_time.val:.4f} ({batch_time.avg:.4f})\t"
+                "Loss {loss.val:.6f} ({loss.avg:.6f})".format(
                     epoch + 1,
                     i,
                     len(train_loader),
