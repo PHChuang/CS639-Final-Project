@@ -5,6 +5,7 @@ import numpy as np
 import random
 import cv2
 from utils import randomFlipRotation
+import glob
 
 class LOLLoader(data.Dataset):
     def __init__(self, root_folder, split="train", is_train=True, transforms=None, patch_size=48):
@@ -16,7 +17,7 @@ class LOLLoader(data.Dataset):
         self.is_train = is_train
 
         img_dir_path = os.path.join(root_folder, split, "low")
-        self.img_list = os.listdir(img_dir_path)
+        self.img_list = [os.path.basename(x) for x in glob.glob(os.path.join(img_dir_path, "*"))]
 
     def __len__(self):
         return len(self.img_list)
