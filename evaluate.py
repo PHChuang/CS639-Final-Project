@@ -127,8 +127,11 @@ def validate(test_loader, model_decomposition, model_restoration, model_adjustme
             # compute output
             reflect_low, illu_low = model_decomposition(img_low)
             restoration_output = model_restoration(reflect_low, illu_low)
+
+            img_low = unpad(img_low, pads)
             restoration_output = unpad(restoration_output, pads)
             illu_low = unpad(illu_low, pads)
+
             adjustment_output = model_adjustment(illu_low, args.ratio)
             adjustment_output = torch.cat([adjustment_output, adjustment_output, adjustment_output], dim=1)
             final_output = adjustment_output * restoration_output

@@ -25,8 +25,8 @@ class DecompositionLoss(nn.Module):
         Im_gradient_y = gradient(Im_gray, "y", self.device)
         I_gradient_y = gradient(I, "y", self.device)
         y_loss = torch.abs(torch.div(I_gradient_y, torch.max(Im_gradient_y, epsilon)))
-        mut_loss = torch.mean(x_loss + y_loss)
-        return mut_loss
+        illu_smooth_loss = torch.mean(x_loss + y_loss)
+        return illu_smooth_loss
 
     def mutual_consistency(self, I_low, I_high):
         low_gradient_x = gradient(I_low, "x", self.device)
@@ -53,11 +53,18 @@ class DecompositionLoss(nn.Module):
         mutual_consistency_loss = self.mutual_consistency(I_low, I_high)
         illumination_smoothness_loss = self.illumination_smoothness(I_low, Im_low) + self.illumination_smoothness(I_high, Im_high)
 
+        # decomposition_loss = (
+        #     1 * reconstruction_loss +
+        #     0.01 * reflectance_similarity_loss +
+        #     0.2 * mutual_consistency_loss +
+        #     0.15 * illumination_smoothness_loss
+        # )
+
         decomposition_loss = (
             1 * reconstruction_loss +
             0.01 * reflectance_similarity_loss +
             0.2 * mutual_consistency_loss +
-            0.15 * illumination_smoothness_loss
+            0.03 * illumination_smoothness_loss
         )
 
         return decomposition_loss
