@@ -15,7 +15,8 @@ class DecompositionNet(nn.Module):
         self.conv4 = nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1)
         self.up5 = nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2)
         self.conv5 = nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1)
-        self.conv6 = nn.Conv2d(32, 3, kernel_size=3, stride=1, padding=1)
+        self.conv6 = nn.Conv2d(32, 3, kernel_size=1, stride=1, padding=0) # author's implementation use 1x1 kernel to replace 3x3 kernel
+        # self.conv6 = nn.Conv2d(32, 3, kernel_size=3, stride=1, padding=1)
 
         # illumination map path
         self.conv7 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
@@ -25,6 +26,10 @@ class DecompositionNet(nn.Module):
         self.lrelu = nn.LeakyReLU(0.2)
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         self.sigmoid = nn.Sigmoid()
+
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):  # Conv2d
+                nn.init.xavier_uniform_(m.weight)
 
     def forward(self, x):
         # reflectance map path
