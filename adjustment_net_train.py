@@ -197,13 +197,17 @@ def train(train_loader, model_decomposition, model_adjustment, criterion, optimi
         # compute output
         illu_low, illu_high = img_low, img_high
         with torch.no_grad():
-            reflect_high, illu_high = model_decomposition(img_high)
-            reflect_low, illu_low = model_decomposition(img_low)
-            bright_low = torch.mean(illu_low)
-            bright_high = torch.mean(illu_high)
-            ratio_high_to_low = torch.div(bright_low, bright_high)
-            ratio_low_to_high = torch.div(bright_high, bright_low)
-        
+            # reflect_high, illu_high = model_decomposition(img_high)
+            # reflect_low, illu_low = model_decomposition(img_low)
+            # bright_low = torch.mean(illu_low)
+            # bright_high = torch.mean(illu_high)
+            # ratio_high_to_low = torch.div(bright_low, bright_high)
+            # ratio_low_to_high = torch.div(bright_high, bright_low)
+            _, illu_high = model_decomposition(img_high)
+            _, illu_low = model_decomposition(img_low)
+            ratio_high_to_low = torch.mean(torch.div(illu_low, (illu_high + 0.0001)))
+            ratio_low_to_high = torch.mean(torch.div(illu_high, (illu_low + 0.0001)))
+
         adjustment_output_low_to_high = model_adjustment(illu_low, ratio_low_to_high)
         adjustment_output_high_to_low = model_adjustment(illu_high, ratio_high_to_low)
         loss = criterion(adjustment_output_low_to_high, illu_high) + criterion(adjustment_output_high_to_low, illu_low)
@@ -262,24 +266,30 @@ def validate(test_loader, model_decomposition, model_adjustment, epoch, args, de
             img_high = img_high.to(device)
 
             # compute output
-            reflect_low, illu_low = model_decomposition(img_low)
-            reflect_high, illu_high = model_decomposition(img_high)
-            bright_low = torch.mean(illu_low)
-            bright_high = torch.mean(illu_high)
-            ratio_high_to_low = torch.div(bright_low, bright_high)
-            ratio_low_to_high = torch.div(bright_high, bright_low)
-            
+            _, illu_high = model_decomposition(img_high)
+            _, illu_low = model_decomposition(img_low)
+            ratio_high_to_low = torch.mean(torch.div(illu_low, (illu_high + 0.0001)))
+            ratio_low_to_high = torch.mean(torch.div(illu_high, (illu_low + 0.0001)))
+
+            # reflect_low, illu_low = model_decomposition(img_low)
+            # reflect_high, illu_high = model_decomposition(img_high)
+            # bright_low = torch.mean(illu_low)
+            # bright_high = torch.mean(illu_high)
+            # ratio_high_to_low = torch.div(bright_low, bright_high)
+            # ratio_low_to_high = torch.div(bright_high, bright_low)
+
             adjustment_output_low_to_high = model_adjustment(illu_low, ratio_low_to_high)
             adjustment_output_high_to_low = model_adjustment(illu_high, ratio_high_to_low)
-            adjustment_output = torch.cat([illu_low, illu_high, adjustment_output_high_to_low, adjustment_output_low_to_high], dim=1)
+
             if i == 0:
-                print(f"[Testing] adjustment_output.shape: {adjustment_output.shape}")
+                print(f"[Testing] adjustment_output.shape: {adjustment_output_low_to_high.shape}")
 
             # store output
-            for j in range(adjustment_output.shape[0]):
+            for j in range(adjustment_output_low_to_high.shape[0]):
                 if epoch == -1:
                     save_tensor_to_image(f"{path}/input_{j}{epoch_info}.jpg", img_low[j])
-                save_tensor_to_image(f"{path}/adjustment_{j}{epoch_info}.jpg", adjustment_output[j])
+                save_tensor_to_image(f"{path}/adjustment_low_to_high_{j}{epoch_info}.jpg", adjustment_output_low_to_high[j])
+                save_tensor_to_image(f"{path}/adjustment_high_to_low_{j}{epoch_info}.jpg", adjustment_output_high_to_low[j])
 
 
 def save_checkpoint(
