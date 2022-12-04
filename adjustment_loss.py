@@ -18,10 +18,8 @@ class AdjustmentLoss(nn.Module):
         self.device = device
 
     def grad_loss(self, A_low, A_high):
-        A_low_gray = rgb_to_grayscale(A_low)
-        A_high_gray = rgb_to_grayscale(A_high)
-        x_loss = torch.square(gradient(A_low_gray, 'x', self.device) - gradient(A_high_gray, 'x', self.device))
-        y_loss = torch.square(gradient(A_low_gray, 'y', self.device) - gradient(A_high_gray, 'y', self.device))
+        x_loss = torch.square(gradient(A_low, 'x', self.device) - gradient(A_high, 'x', self.device))
+        y_loss = torch.square(gradient(A_low, 'y', self.device) - gradient(A_high, 'y', self.device))
         grad_loss_all = torch.mean(x_loss + y_loss)
         return grad_loss_all
 

@@ -24,6 +24,7 @@ import custom_transforms as transforms
 import cv2
 import numpy as np
 
+from datetime import datetime
 
 parser = argparse.ArgumentParser(description="Low-light Image Enhancement")
 parser.add_argument("data_folder", metavar="DIR", help="path to dataset")
@@ -182,6 +183,7 @@ def train(train_loader, model_decomposition, model_adjustment, criterion, optimi
 
     model_decomposition.eval()
     model_adjustment.train()
+    print(f"[Training] current time: {datetime.now()}")
     for i, (img_high, img_low) in enumerate(train_loader):
         end = time.time()
         if i == 0:
@@ -288,7 +290,9 @@ def validate(test_loader, model_decomposition, model_adjustment, epoch, args, de
             for j in range(adjustment_output_low_to_high.shape[0]):
                 if epoch == -1:
                     save_tensor_to_image(f"{path}/input_{j}{epoch_info}.jpg", img_low[j])
+                save_tensor_to_image(f"{path}/illu_low_{j}{epoch_info}.jpg", illu_low[j])
                 save_tensor_to_image(f"{path}/adjustment_low_to_high_{j}{epoch_info}.jpg", adjustment_output_low_to_high[j])
+                save_tensor_to_image(f"{path}/illu_high_{j}{epoch_info}.jpg", illu_high[j])
                 save_tensor_to_image(f"{path}/adjustment_high_to_low_{j}{epoch_info}.jpg", adjustment_output_high_to_low[j])
 
 
