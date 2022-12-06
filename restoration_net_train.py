@@ -228,7 +228,7 @@ def train(train_loader, model_decomposition, model_resotration, criterion, optim
                 )
             )
 
-    scheduler.step()
+    # scheduler.step()
 
     # print the learning rate
     print(

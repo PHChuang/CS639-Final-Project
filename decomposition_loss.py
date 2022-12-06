@@ -51,20 +51,13 @@ class DecompositionLoss(nn.Module):
         reconstruction_loss = self.reconstruction_error(Im_low, Im_high, R_low, R_high, I_low, I_high)
         reflectance_similarity_loss = self.reflectance_similarity(R_low, R_high)
         mutual_consistency_loss = self.mutual_consistency(I_low, I_high)
-        illumination_smoothness_loss = self.illumination_smoothness(I_low, Im_low) + self.illumination_smoothness(I_high, Im_high)
-
-        # decomposition_loss = (
-        #     1 * reconstruction_loss +
-        #     0.01 * reflectance_similarity_loss +
-        #     0.2 * mutual_consistency_loss +
-        #     0.15 * illumination_smoothness_loss
-        # )
+        illumination_smoothness_loss = self.illumination_smoothness(I_high, Im_high) + self.illumination_smoothness(I_low, Im_low)
 
         decomposition_loss = (
             1 * reconstruction_loss +
-            0.01 * reflectance_similarity_loss +
+            0.009 * reflectance_similarity_loss +
             0.2 * mutual_consistency_loss +
-            0.03 * illumination_smoothness_loss
+            0.005 * illumination_smoothness_loss
         )
 
         return decomposition_loss

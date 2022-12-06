@@ -104,7 +104,7 @@ def main(args):
 
     # setup optimizer and scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.997)
+    # scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.997)
 
     # resume from a checkpoint
     if args.resume:
@@ -155,7 +155,7 @@ def main(args):
     print("Training the model ...")
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, scheduler, epoch, args, device)
+        train(train_loader, model, criterion, optimizer, None, epoch, args, device)
 
         # save checkpoint
         save_checkpoint(
@@ -217,12 +217,18 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args, dev
                 )
             )
 
-    scheduler.step()
+    # scheduler.step()
 
     # print the learning rate
+    # print(
+    #     "[Training]: Epoch {:d} finished with lr={:f}".format(
+    #         epoch + 1, scheduler.get_last_lr()[0]
+    #     )
+    # )
+
     print(
-        "[Training]: Epoch {:d} finished with lr={:f}".format(
-            epoch + 1, scheduler.get_last_lr()[0]
+        "[Training]: Epoch {:d}".format(
+            epoch + 1
         )
     )
 
