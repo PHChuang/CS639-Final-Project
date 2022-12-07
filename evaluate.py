@@ -20,6 +20,11 @@ from adjustment_model import AdjustmentNet
 
 import custom_transforms as transforms
 
+from torchmetrics import StructuralSimilarityIndexMeasure
+
+from ignite.engine import *
+from ignite.metrics import *
+
 
 parser = argparse.ArgumentParser(description="Low-light Image Enhancement")
 parser.add_argument("data_folder", metavar="DIR", help="path to dataset")
@@ -98,7 +103,7 @@ def main(args):
     test_dataset = LOLLoader(args.data_folder, split="test", is_train=False, transforms=test_transforms)
     test_loader = DataLoader(test_dataset, batch_size=15, pin_memory=True, shuffle=False)
 
-    print("Testing the model ...")
+    print(f"Testing the model with ratio = {args.ratio} ...")
     # cudnn.deterministic = True
     validate(test_loader, model_decomposition, model_restoration, model_adjustment, args, device, path="./evaluation_images")
     return
@@ -110,19 +115,29 @@ def validate(test_loader, model_decomposition, model_restoration, model_adjustme
     if not os.path.exists(path):
         os.mkdir(path)
 
+    # SSIM evaluator
+    ssim = StructuralSimilarityIndexMeasure(data_range=1).to(device)
+
+    # PSNR evaluator
+    default_evaluator = Engine(eval_step)
+    psnr = PSNR(data_range=1.0)
+    psnr.attach(default_evaluator, 'psnr')
+
     # switch to evaluate mode (autograd will still track the graph!)
     model_decomposition.eval()
     model_restoration.eval()
     model_adjustment.eval()
     with torch.no_grad():
         # loop over validation set
-        for i, (_, img_low) in enumerate(test_loader):
+        for i, (img_high, img_low) in enumerate(test_loader):
             if i == 0:
                 print(f"[Testing] img_low.shape: {img_low.shape}")
 
             # padding for input to avoid odd resolution issue
             img_low, pads = pad_to(img_low, 16)
             img_low = img_low.to(device)
+
+            img_high = img_high.to(device)
 
             # compute output
             reflect_low, illu_low = model_decomposition(img_low)
@@ -145,12 +160,27 @@ def validate(test_loader, model_decomposition, model_restoration, model_adjustme
                 save_tensor_to_image(f"{path}/adjustment_{j}_ratio{args.ratio}.jpg", adjustment_output[j])
                 save_tensor_to_image(f"{path}/final_{j}_ratio{args.ratio}.jpg", final_output[j])
 
+            # output SSIM
+            print(f"SSIM (before): {ssim(img_low, img_high)}")
+            print(f"SSIM (after): {ssim(final_output, img_high)}")
+
+            # output PSNR
+            state = default_evaluator.run([[img_low.detach().cpu(), img_high.detach().cpu()]])
+            print(f"PSNR (before): {state.metrics['psnr']}")
+            state = default_evaluator.run([[final_output.detach().cpu(), img_high.detach().cpu()]])
+            print(f"PSNR (after): {state.metrics['psnr']}")
+
 
 def get_test_transforms():
     val_transforms = []
     val_transforms.append(transforms.ToTensor())
     val_transforms = transforms.Compose(val_transforms)
     return val_transforms
+
+
+def eval_step(engine, batch):
+    return batch
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
